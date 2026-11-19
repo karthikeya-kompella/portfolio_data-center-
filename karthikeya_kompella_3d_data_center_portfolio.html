@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Karthikeya Kompella — 3D Data Center Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+  <style>
+    :root {
+      --bg-navy: #040812;
+      --panel-bg: rgba(7, 12, 24, 0.94);
+      --border-subtle: rgba(0, 240, 255, 0.24);
+      --cyan: #00f0ff;
+      --amber: #ffb000;
+      --text-main: #e6f1ff;
+      --text-muted: #8fa3bf;
+      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background-color: var(--bg-navy);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      overflow-x: hidden;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 240, 255, 0.35) var(--bg-navy);
+    }
+
+    #webgl-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      z-index: 1;
+    }
+
+    #scroll-track {
+      position: relative;
+      width: 100%;
+      height: 950vh;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* Loading Screen */
+    #loading-screen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      background: #03060e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+    }
+    #loading-screen.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .loader-title {
+      font-family: var(--font-mono);
+      font-size: 0.92rem;
+      letter-spacing: 0.18em;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    .loader-bar-wrap {
+      width: min(300px, 75vw);
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .loader-bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--cyan), var(--amber));
+      transition: width 0.25s ease;
+    }
+    .loader-status {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    /* Top HUD */
+    .hud-top {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      pointer-events: none;
+    }
+    .hud-brand {
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .hud-brand-name {
+      font-weight: 700;
+      font-size: 0.95rem;
+      letter-spacing: 0.04em;
+      color: #fff;
+    }
+    .hud-brand-sub {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+    }
+    .room-sign-hud {
+      pointer-events: none;
+      background: rgba(5, 10, 22, 0.82);
+      border: 1px solid var(--border-subtle);
+      backdrop-filter: blur(10px);
+      padding: 8px 18px;
+      border-radius: 999px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 0 24px rgba(0, 240, 255, 0.14);
+    }
+    .room-sign-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+    }
+    .room-sign-label {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-main);
+    }
+    .hud-actions {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-pill {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 240, 255, 0.4);
+      background: rgba(8, 15, 30, 0.85);
+      color: var(--cyan);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      backdrop-filter: blur(8px);
+    }
+    .btn-pill:hover, .btn-pill:focus-visible {
+      background: rgba(0, 240, 255, 0.16);
+      border-color: var(--cyan);
+      outline: none;
+    }
+
+    /* Hero Overlay */
+    #hero-overlay {
+      position: fixed;
+      left: 50%;
+      bottom: 38px;
+      transform: translateX(-50%);
+      z-index: 15;
+      text-align: center;
+      pointer-events: none;
+      width: min(700px, 92vw);
+      transition: opacity 0.45s ease, transform 0.45s ease;
+    }
+    #hero-overlay.faded {
+      opacity: 0;
+      transform: translate(-50%, 16px);
+    }
+    .hero-title {
+      font-size: clamp(1.55rem, 3.2vw, 2.35rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      text-shadow: 0 2px 24px rgba(0, 0, 0, 0.95);
+    }
+    .hero-sub {
+      margin-top: 6px;
+      font-size: 0.92rem;
+      color: #b7c9e2;
+      text-shadow: 0 2px 12px rgba(0, 0, 0, 0.95);
+    }
+    .scroll-cue {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      padding: 7px 16px;
+      border-radius: 999px;
+      background: rgba(5, 10, 22, 0.8);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      animation: floatCue 2.2s ease-in-out infinite;
+    }
+    @keyframes floatCue {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(4px); }
+    }
+
+    /* Mini-Map */
+    .minimap {
+      position: fixed;
+      right: 18px;
+      top: 50%;
+      transform: translateY(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(6, 10, 20, 0.76);
+      border: 1px solid rgba(255, 255, 255, 0.09);
+      padding: 10px;
+      border-radius: 14px;
+      backdrop-filter: blur(10px);
+    }
+    .minimap-btn {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 4px 6px;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      transition: color 0.2s ease, background 0.2s ease;
+    }
+    .minimap-btn:hover, .minimap-btn:focus-visible {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.06);
+      outline: none;
+    }
+    .minimap-btn.active {
+      color: var(--cyan);
+      font-weight: 600;
+    }
+    .minimap-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.22);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+    .minimap-btn.active .minimap-dot {
+      background: var(--cyan);
+      box-shadow: 0 0 8px var(--cyan);
+      transform: scale(1.3);
+    }
+
+    /* Hover Tooltip */
+    #hover-label {
+      position: fixed;
+      z-index: 30;
+      pointer-events: none;
+      background: rgba(5, 10, 22, 0.94);
+      border: 1px solid var(--cyan);
+      color: #fff;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      padding: 6px 11px;
+      border-radius: 8px;
+      box-shadow: 0 4px 20px rgba(0, 240, 255, 0.25);
+      opacity: 0;
+      transform: translate(12px, -50%);
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+    }
+    #hover-label.visible { opacity: 1; }
+
+    /* Slide-in Project Detail Panel */
+    #project-panel {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(490px, 100vw);
+      height: 100vh;
+      z-index: 40;
+      background: var(--panel-bg);
+      border-left: 1px solid var(--border-subtle);
+      backdrop-filter: blur(18px);
+      padding: 28px 26px 40px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #project-panel.open { transform: translateX(0); }
+    .panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .panel-room-tag {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--cyan);
+    }
+    .panel-title {
+      margin-top: 4px;
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+    .panel-close {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #fff;
+      width: 34px;
+      height: 34px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+    .panel-close:hover { border-color: var(--cyan); color: var(--cyan); }
+    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .badge {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(0, 240, 255, 0.1);
+      border: 1px solid rgba(0, 240, 255, 0.28);
+      color: var(--cyan);
+    }
+    .badge.planned {
+      background: rgba(56, 189, 248, 0.14);
+      border-color: #38bdf8;
+      color: #7dd3fc;
+    }
+    .panel-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      font-size: 0.89rem;
+      line-height: 1.55;
+      color: #d6e3f5;
+    }
+    .panel-list li {
+      position: relative;
+      padding-left: 16px;
+    }
+    .panel-list li::before {
+      content: '›';
+      position: absolute;
+      left: 0;
+      color: var(--cyan);
+      font-weight: 700;
+    }
+    .panel-section-title {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+    .stack-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .stack-pill {
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+      padding: 4px 9px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-main);
+    }
+    .progress-wrap {
+      background: rgba(255, 255, 255, 0.07);
+      border-radius: 999px;
+      height: 8px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, var(--cyan));
+    }
+    .panel-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+    .panel-link-btn {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      text-decoration: none;
+      background: rgba(0, 240, 255, 0.14);
+      border: 1px solid var(--cyan);
+      color: #fff;
+      cursor: pointer;
+    }
+    .panel-link-btn:hover { background: rgba(0, 240, 255, 0.28); }
+    .blueprint-svg-box {
+      background: rgba(4, 18, 36, 0.85);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    /* Quick View & About Me Modal */
+    #quick-view-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(3, 6, 14, 0.95);
+      backdrop-filter: blur(14px);
+      overflow-y: auto;
+      padding: 32px 20px;
+      display: none;
+    }
+    #quick-view-modal.open { display: block; }
+    .qv-container { max-width: 980px; margin: 0 auto; }
+    .qv-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      padding-bottom: 18px;
+      margin-bottom: 22px;
+    }
+    .about-card {
+      background: rgba(9, 17, 34, 0.92);
+      border: 1px solid rgba(0, 240, 255, 0.26);
+      border-radius: 14px;
+      padding: 22px 24px;
+      margin-bottom: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      line-height: 1.62;
+      font-size: 0.92rem;
+      color: #d6e3f5;
+    }
+    .about-card h3 {
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .about-card strong { color: #fff; }
+    .qv-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+    }
+    .qv-card {
+      background: rgba(11, 18, 34, 0.9);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .qv-card h3 { font-size: 1.02rem; }
+    .qv-card-room {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--cyan);
+      text-transform: uppercase;
+    }
+    .toast {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 80;
+      background: #0d1b2e;
+      border: 1px solid var(--cyan);
+      color: #fff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .toast.show { opacity: 1; }
+
+    @media (max-width: 768px) {
+      .minimap, .room-sign-hud { display: none; }
+      .hud-top { padding: 12px 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loading-screen" role="status" aria-live="polite">
+    <div class="loader-title">Booting Data Center Corridor</div>
+    <div class="loader-bar-wrap"><div class="loader-bar-fill" id="loader-fill"></div></div>
+    <div class="loader-status" id="loader-status">Initializing racks &amp; cooling aisles...</div>
+  </div>
+
+  <canvas id="webgl-canvas" aria-label="Interactive 3D Data Center Portfolio"></canvas>
+  <div id="scroll-track" aria-hidden="true"></div>
+
+  <header class="hud-top">
+    <div class="hud-brand">
+      <span class="hud-brand-name">Karthikeya Kompella</span>
+      <span class="hud-brand-sub">CS (Data Analytics) · VIT-AP ’28</span>
+    </div>
+    <div class="room-sign-hud" aria-live="polite">
+      <span class="room-sign-dot" id="room-dot"></span>
+      <span class="room-sign-label" id="room-sign-text">01 · Entrance Hall</span>
+    </div>
+    <div class="hud-actions">
+      <button type="button" class="btn-pill" id="about-btn">About Me</button>
+      <button type="button" class="btn-pill" id="quick-view-btn">Quick View</button>
+    </div>
+  </header>
+
+  <section id="hero-overlay" aria-label="Introduction">
+    <h1 class="hero-title">Karthikeya Kompella</h1>
+    <p class="hero-sub">Artificial Intelligence · Backend Engineering · Data Systems</p>
+    <div class="scroll-cue">↓ Scroll to dive into the data center</div>
+  </section>
+
+  <nav class="minimap" aria-label="Data center rooms" id="minimap"></nav>
+  <div id="hover-label" role="tooltip"></div>
+
+  <aside id="project-panel" aria-hidden="true" aria-labelledby="panel-title">
+    <div class="panel-header">
+      <div>
+        <div class="panel-room-tag" id="panel-room-tag">Room</div>
+        <h2 class="panel-title" id="panel-title">Project</h2>
+      </div>
+      <button type="button" class="panel-close" id="panel-close-btn" aria-label="Close panel">×</button>
+    </div>
+    <div class="badge-row" id="panel-badges"></div>
+    <div id="panel-progress-block" style="display:none;">
+      <div class="panel-section-title" style="margin-bottom:6px;">Status Progress</div>
+      <div class="progress-wrap"><div class="progress-fill" id="panel-progress-fill"></div></div>
+    </div>
+    <ul class="panel-list" id="panel-bullets"></ul>
+    <div id="panel-blueprint-wrap" style="display:none;">
+      <div class="panel-section-title" style="margin-bottom:6px;">Planned Architecture</div>
+      <div class="blueprint-svg-box" id="panel-blueprint-svg"></div>
+    </div>
+    <div>
+      <div class="panel-section-title" style="margin-bottom:6px;">Tech Stack</div>
+      <div class="stack-pills" id="panel-stack"></div>
+    </div>
+    <div class="panel-links" id="panel-links"></div>
+  </aside>
+
+  <!-- Quick View + About Me Modal -->
+  <section id="quick-view-modal" role="dialog" aria-modal="true" aria-label="Quick View and About Me">
+    <div class="qv-container">
+      <div class="qv-top">
+        <div>
+          <h2 style="font-size:1.45rem;">Karthikeya Kompella — Portfolio &amp; About Me</h2>
+          <p style="color:var(--text-muted); font-size:0.88rem; margin-top:4px;">
+            Computer Science Undergraduate (Data Analytics), VIT-AP University · AI, Backend Engineering &amp; Data Systems
+          </p>
+        </div>
+        <button type="button" class="btn-pill" id="qv-close-btn">Back to 3D Corridor</button>
+      </div>
+      <div class="about-card" id="about-card"></div>
+      <div class="qv-grid" id="qv-grid"></div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <script>
+    // =========================================================================
+    // 1. PORTFOLIO CONTENT (Rich Descriptions, About Me, Zero Blanks)
+    // =========================================================================
+    const ROOM_ORDER = [
+      'entrance',
+      'data',
+      'ml',
+      'ai',
+      'research',
+      'backend',
+      'blueprint',
+      'founders',
+      'control',
+    ];
+
+    const ABOUT_ME_PARAGRAPHS = [
+      "I'm Karthikeya, a Computer Science undergraduate specializing in Data Analytics at VIT-AP University.",
+      "I'm interested in building intelligent systems that solve real-world problems. My primary focus lies at the intersection of <strong>Artificial Intelligence, Backend Engineering, and Data Systems</strong>.",
+      "I enjoy exploring how things work under the hood — from designing efficient data pipelines and backend architectures to experimenting with LLMs, RAG systems, and AI-powered applications.",
+      "Over time, I've worked with technologies such as Python, Java, C++, SQL, FastAPI, vector databases, and various open-source AI tools. I've also explored building multilingual AI assistants, retrieval-based systems, and data-driven applications.",
+      "I believe good engineering goes beyond making something work. It's about understanding the problem, making thoughtful technical decisions, and building systems that are reliable, scalable, and useful.",
+      "Currently, I'm focused on strengthening my foundations in computer science, exploring modern AI systems, and becoming a better engineer through continuous building and experimentation."
+    ];
+
+    const PORTFOLIO_CONTENT = {
+      rooms: {
+        entrance: {
+          num: '01',
+          name: 'Entrance Hall',
+          color: '#00f0ff',
+          items: [
+            {
+              id: 'about-me-rack',
+              title: 'About Me · Karthikeya',
+              tags: ['VIT-AP University', 'Data Analytics'],
+              bullets: ABOUT_ME_PARAGRAPHS,
+              stack: ['Python', 'Java', 'C++', 'SQL', 'FastAPI', 'Vector DBs'],
+              links: [],
+            },
+            {
+              id: 'role-data-analyst',
+              title: 'Data Analyst',
+              tags: ['Role Focus', 'BI & Mining'],
+              bullets: [
+                'Specializing in Data Analytics at VIT-AP University (B.Tech CSE, Minor: Fintech, graduating 2028).',
+                'Translates messy datasets into clear business insights using association-rule mining (Apriori), exploratory analysis, and Power BI dashboards.',
+                'Focuses on surfacing actionable drivers—not just plotting charts—so teams know why metrics move.',
+              ],
+              stack: ['Python', 'Pandas', 'SQL', 'Power BI', 'mlxtend'],
+              links: [],
+            },
+            {
+              id: 'role-ml-engineer',
+              title: 'ML Engineer',
+              tags: ['Role Focus', 'Classical ML & NLP'],
+              bullets: [
+                'Designs end-to-end classification, regression, and NLP pipelines from raw preprocessing to model evaluation.',
+                'Handles real-world data challenges including feature encoding, TF-IDF + sentiment engineering, and severe class imbalance.',
+                'Prioritizes interpretable baselines and reliable validation before reaching for heavier architectures.',
+              ],
+              stack: ['scikit-learn', 'TF-IDF', 'Linear SVM', 'Random Forest'],
+              links: [],
+            },
+            {
+              id: 'role-data-scientist',
+              title: 'Data Scientist',
+              tags: ['Role Focus', 'Research & EEG'],
+              bullets: [
+                'First-author published researcher on EEG biomarker extraction and narrative generation (NeuroRAG).',
+                'Combines statistical signal processing with cosine-similarity retrieval and LLMs.',
+              ],
+              stack: ['MNE', 'SQLite', 'Cosine Retrieval', 'Python'],
+              links: [],
+            },
+            {
+              id: 'role-ai-developer',
+              title: 'AI & Backend Developer',
+              tags: ['Role Focus', 'RAG & Systems'],
+              bullets: [
+                'Builds production-minded AI backends at the intersection of Artificial Intelligence, Backend Engineering, and Data Systems.',
+                'Architected KRAG (multi-tenant RAG SaaS with hybrid BM25 + vector retrieval), local-LLM Chrome extensions, and multilingual assistants.',
+                'Long-term goal: gain deep industry engineering experience, then scale my own startup.',
+              ],
+              stack: ['FastAPI', 'PostgreSQL', 'ChromaDB', 'Celery', 'Redis', 'Ollama'],
+              links: [],
+            },
+          ],
+        },
+        data: {
+          num: '02',
+          name: 'Data Room',
+          color: '#00e5ff',
+          items: [
+            {
+              id: 'churn-prediction',
+              title: 'Customer Churn Prediction',
+              tags: ['Data Mining', 'Classification'],
+              bullets: [
+                'End-to-end telecom churn analysis and prediction system built on a 7,043-customer dataset.',
+                'Applied Apriori association-rule mining to uncover exact combinations of customer behaviours and service plans that co-occur with churn.',
+                'Trained a Random Forest classifier on the cleaned and encoded feature set to score individual churn risk.',
+                'Paired both approaches so the association rules explain why customers leave while the classifier predicts who is likely to leave.',
+                'Implemented structured preprocessing covering missing-value handling, categorical encoding, and class-imbalance mitigation.',
+              ],
+              stack: ['Python', 'Pandas', 'scikit-learn', 'mlxtend', 'Apriori', 'Random Forest'],
+              links: [],
+            },
+            {
+              id: 'kubera',
+              title: 'Kubera / Trading Copilot',
+              tags: ['v1 Complete · v2 In Progress', 'Power BI + ML'],
+              bullets: [
+                'Stock-analysis project combining an interactive Power BI analytics dashboard with a supervised ML signal model.',
+                'Classifies equity setups into BUY, SELL, and HOLD style signals for structured market screening.',
+                'Identified and resolved a severe HOLD-class imbalance problem where neutral labels dominated training.',
+                'Currently paused at v1 complete with v2 planned to expand technical indicators and evaluation.',
+              ],
+              stack: ['Python', 'Pandas', 'Power BI', 'scikit-learn'],
+              links: [],
+            },
+          ],
+        },
+        ml: {
+          num: '03',
+          name: 'Machine Learning Room',
+          color: '#a855f7',
+          items: [
+            {
+              id: 'fake-review',
+              title: 'Fake Review Detection',
+              tags: ['NLP', 'Linear SVM', '~89.6% F1'],
+              bullets: [
+                'Natural Language Processing classifier that distinguishes genuine product reviews from deceptive/fake ones.',
+                'Built a full text pipeline: cleaning, tokenisation, and TF-IDF vectorisation.',
+                'Engineered sentiment polarity features alongside n-gram text representations to capture unnatural review tone.',
+                'Trained a Linear SVM classifier achieving roughly 89.6% F1 score.',
+              ],
+              stack: ['Python', 'scikit-learn', 'TF-IDF', 'Linear SVM', 'NLTK / spaCy'],
+              links: [],
+            },
+            {
+              id: 'insurance-predictor',
+              title: 'Health Insurance Premium Predictor',
+              tags: ['Regression', 'Supervised ML'],
+              bullets: [
+                'Supervised regression pipeline built to estimate individual health insurance premiums from demographic and lifestyle attributes.',
+                'Applies feature scaling, categorical encoding, and regression modeling to understand how risk factors drive policy pricing.',
+              ],
+              stack: ['Python', 'scikit-learn', 'Pandas'],
+              links: [],
+            },
+          ],
+        },
+        ai: {
+          num: '04',
+          name: 'AI / GenAI Room',
+          color: '#00ffa3',
+          items: [
+            {
+              id: 'krag',
+              title: 'KRAG: Multi-tenant RAG SaaS',
+              tags: ['Flagship', 'Hybrid Retrieval'],
+              bullets: [
+                'Multi-tenant Retrieval-Augmented Generation platform where every organisation gets strictly isolated document namespaces and data.',
+                'FastAPI backend secured with JWT authentication and backed by PostgreSQL + SQLAlchemy for tenant metadata.',
+                'Asynchronous document chunking and embedding ingestion pipeline powered by Celery workers and Redis.',
+                'Hybrid retrieval combining BM25 keyword search with ChromaDB vector search, merged via Reciprocal Rank Fusion (RRF) for high-precision grounding.',
+                'Written by hand layer by layer; already adapted into a real-world medical clinic pilot (Medi RAG) under KNETRA.',
+              ],
+              stack: ['FastAPI', 'PostgreSQL', 'SQLAlchemy', 'Celery', 'Redis', 'ChromaDB', 'BM25 + RRF', 'React / Vite'],
+              links: [{ label: 'GitHub', url: 'https://github.com/karthikeya-kompella/KRAG---BACKEND' }],
+            },
+            {
+              id: 'ip-sakti',
+              title: 'IP-SAKTI Sahayak',
+              tags: ['Smart India Hackathon', 'VIT-AP'],
+              bullets: [
+                'Multilingual, multi-jurisdiction RAG assistant built for Ayurveda intellectual property (IP) and regulatory guidance.',
+                'Extends the KRAG architecture to retrieve across complex patent and regulatory rulebooks across jurisdictions.',
+                'Answers user queries in multiple languages while grounding every response in retrieved source citations.',
+                'Qualified to the next Smart India Hackathon (SIH) round, representing VIT-AP University.',
+              ],
+              stack: ['KRAG Architecture', 'Multilingual RAG', 'FastAPI', 'Vector Search'],
+              links: [],
+            },
+            {
+              id: 'paradox',
+              title: 'Paradox (48-hour Hackathon)',
+              tags: ['Multi-Agent', 'Code Review'],
+              bullets: [
+                'Multi-agent developer automation system built during a 48-hour hackathon to review uploaded codebases end to end.',
+                'Agent 1 parses and summarises the codebase architecture; Agent 2 writes unit tests and executes them in an isolated sandbox; Agent 3 runs security and penetration checks.',
+                'Synthesises all three outputs into a unified code summary and actionable debugging report.',
+              ],
+              stack: ['Multi-Agent Orchestration', 'Sandbox Execution', 'Security Analysis', 'Python'],
+              links: [],
+            },
+            {
+              id: 'karthikeya-agent',
+              title: 'karthikeya-agent',
+              tags: ['Chrome Extension', 'Local LLM'],
+              bullets: [
+                'Privacy-first Manifest V3 Chrome extension that lets users chat with and ask questions about any active webpage.',
+                'Connects to a local LLM via Ollama so page content never leaves the user’s machine.',
+                'Splits DOM text into chunks, ranks relevant passages using client-side TF-IDF retrieval, and streams answers into a clean side-panel UI.',
+              ],
+              stack: ['Manifest V3', 'Ollama', 'TF-IDF', 'JavaScript', 'Side Panel API'],
+              links: [{ label: 'GitHub', url: 'https://github.com/karthikeya-kompella/karthikeya-agent' }],
+            },
+            {
+              id: 'ai-shelf',
+              title: 'Voice & Workflow Agents',
+              tags: ['Jarvis', 'n8n', 'Google ADK'],
+              bullets: [
+                'Jarvis Voice Assistant: fully local speech pipeline combining Whisper (speech-to-text), Ollama (local LLM reasoning), and pyttsx3 (text-to-speech).',
+                'n8n AI Agents: automated workflow-orchestration agents connecting triggers, LLM steps, and external APIs.',
+                'Hack2Skill Gen AI Academy Lab 1: tool-using AI agent built with Google ADK and deployed on Cloud Run.',
+              ],
+              stack: ['Whisper', 'Ollama', 'pyttsx3', 'n8n', 'Google ADK', 'Cloud Run'],
+              links: [],
+            },
+          ],
+        },
+        research: {
+          num: '05',
+          name: 'Research Lab',
+          color: '#38bdf8',
+          items: [
+            {
+              id: 'neurorag',
+              title: 'NeuroRAG',
+              tags: ['Published · Zenodo', 'First Author'],
+              bullets: [
+                'Published research pipeline that converts raw EEG brainwave signals into readable, clinical-style narrative reports.',
+                'Uses MNE for EEG signal preprocessing and extracts quantitative biomarkers: Theta/Alpha ratio, Frontal Alpha Asymmetry, and Engagement Index.',
+                'Performs cosine-similarity retrieval over an SQLite case store to surface similar historical EEG patterns.',
+                'Prompts an LLM with the extracted biomarkers and retrieved cases to generate grounded, interpretable narratives.',
+                'Published on Zenodo (DOI: 10.5281/zenodo.20677189) as First Author.',
+              ],
+              stack: ['MNE', 'SQLite', 'Cosine Retrieval', 'LLM', 'Python'],
+              links: [{ label: 'Zenodo DOI', url: 'https://doi.org/10.5281/zenodo.20677189' }],
+            },
+            {
+              id: 'neurobuddy',
+              title: 'NeuroBuddy',
+              tags: ['In Development', 'KNETRA R&D'],
+              bullets: [
+                'EEG-driven focus optimisation system that dynamically adapts background music to the user’s real-time measured focus state.',
+                'Extends the NeuroRAG biomarker pipeline into a closed-loop cognitive feedback experience.',
+                'Submitted as a V-LAUNCH seed grant proposal and selected for the VIT-AP IIEC E-Cell idea presentation (Stage 1).',
+                'Software engineering is actively being developed under KNETRA’s R&D wing.',
+              ],
+              stack: ['EEG Signal Processing', 'Adaptive Audio', 'NeuroRAG', 'Python'],
+              links: [],
+            },
+          ],
+        },
+        backend: {
+          num: '06',
+          name: 'Backend & Systems Room',
+          color: '#f97316',
+          items: [
+            {
+              id: 'ig-backend',
+              title: 'Instagram-Clone Backend',
+              tags: ['FastAPI', 'MongoDB'],
+              bullets: [
+                'Asynchronous social-media backend built with FastAPI and MongoDB, focused on complex aggregation pipelines and query optimisation.',
+                'Uses Motor for non-blocking async MongoDB operations and Pydantic schemas (UserCreate, UserInDB, UserOut) for strict request/response validation.',
+                'Implements secure bcrypt password hashing, user signup endpoints, and Redis alongside MongoDB for fast state handling.',
+              ],
+              stack: ['FastAPI', 'MongoDB', 'Motor', 'Pydantic', 'bcrypt', 'Redis'],
+              links: [],
+            },
+            {
+              id: 'attendance-app',
+              title: 'Attendance App (Backend)',
+              tags: ['FastAPI', 'Face Recognition'],
+              bullets: [
+                'Engineered the FastAPI backend service and computer-vision face-recognition pipeline to automate attendance verification.',
+                'Handles image ingestion, face-embedding comparison, and attendance logging via REST endpoints (paired with a generated frontend).',
+              ],
+              stack: ['FastAPI', 'Face Recognition', 'Python', 'REST API'],
+              links: [],
+            },
+            {
+              id: 'weather-dashboard',
+              title: 'Weather Dashboard',
+              tags: ['Full-Stack Web', 'TypeScript'],
+              bullets: [
+                'Full-stack weather forecasting web application built with a React + TypeScript frontend and a Node.js + Express backend proxy.',
+                'Fetches and normalises live meteorological data on the server side, presenting clean multi-metric forecasts and responsive UI states.',
+              ],
+              stack: ['React', 'TypeScript', 'Node.js', 'Express'],
+              links: [],
+            },
+            {
+              id: 'traffic-chaser',
+              title: 'Traffic Chaser',
+              tags: ['Python Game', 'Foundations'],
+              bullets: [
+                'First-year arcade-style Python game built to master object-oriented programming, game loops, collision detection, and real-time state updates.',
+                'Implements progressive difficulty scaling, player lane controls, and score tracking.',
+              ],
+              stack: ['Python', 'OOP', 'Game Loop'],
+              links: [],
+            },
+          ],
+        },
+        blueprint: {
+          num: '07',
+          name: 'Blueprint Room',
+          color: '#38bdf8',
+          items: [
+            {
+              id: 'ridegrid',
+              title: 'RideGrid (Working Name)',
+              tags: ['PLANNED'],
+              statusProgress: 10,
+              expectedStart: 'About Feb 2027 (after DSA & system-design phase)',
+              bullets: [
+                'Unified ride-hailing and delivery tracking platform: one backend serving Uber/Rapido-style rides and Blinkit-style deliveries.',
+                'Real-time worker GPS streaming over persistent WebSockets into Redis GEO (geospatial nearest-driver lookup) and Redis Pub/Sub.',
+                'Models the road network as a weighted graph with Dijkstra and A* routing, benchmarked against BFS/DFS baselines.',
+                'Multi-agent orchestration layer (Dispatcher, ETA/Pricing, Support RAG, Telugu/Hindi/English Voice Agent, Fraud/Anomaly, Supervisor).',
+                'System-design target: load balancing, sharding, replication, and a documented architecture for 100,000 concurrent rider pings.',
+              ],
+              stack: ['FastAPI', 'PostgreSQL', 'Redis GEO', 'Redis Pub/Sub', 'WebSockets', 'Leaflet.js', 'Whisper'],
+              blueprintNodes: ['Worker GPS', 'WebSockets', 'Redis GEO / PubSub', 'FastAPI + Graph', 'Multi-Agent Layer'],
+              links: [],
+            },
+            {
+              id: 'stocksense',
+              title: 'StockSense (Working Name)',
+              tags: ['PLANNED'],
+              statusProgress: 10,
+              expectedStart: 'PLANNED (builds on Kubera & Stock Market RAG)',
+              bullets: [
+                'Stock market analyser combining an ML classification signal (BUY / HOLD / SELL), a news RAG assistant, and an analytics dashboard.',
+                'Technical indicator engineering (RSI, MACD, moving averages) paired with the class-imbalance fix from Kubera.',
+                'Walk-forward validation to strictly prevent look-ahead bias, plus a backtesting engine benchmarked against buy-and-hold.',
+                'Multi-agent analyst team (Data, Technical, News/Sentiment, Risk, Writer, Supervisor) generating daily structured reports.',
+                'Disclaimer: educational project, not financial advice.',
+              ],
+              stack: ['Python', 'ML Classifier', 'RAG', 'Multi-Agent', 'Power BI / React'],
+              blueprintNodes: ['Price & News Feed', 'RSI / MACD + ML', 'Walk-Forward Test', 'News RAG', 'Analyst Agents'],
+              links: [],
+            },
+          ],
+        },
+        founders: {
+          num: '08',
+          name: "Founder's Office · KNETRA",
+          color: '#fbbf24',
+          items: [
+            {
+              id: 'knetra',
+              title: 'KNETRA — Automation Studio',
+              tags: ['Founder', 'Hyderabad · Oct 2026', 'Team of 3'],
+              bullets: [
+                'Automation studio founded in Hyderabad (launched October 2026) with a core team of three.',
+                'Tagline: “We find where your business leaks money. Then we automate it.”',
+                'Builds WhatsApp, voice-call, and workflow automation systems supporting Telugu, Hindi, and English.',
+                'Lead offer: a free “leak audit” (sample audits on the site are labelled illustrative).',
+                'First client project: Medi RAG (pilot) for a medical clinic, adapted from the KRAG architecture; R&D wing is building NeuroBuddy.',
+              ],
+              stack: ['WhatsApp Automation', 'Voice Agents', 'KRAG / Medi RAG', 'R&D'],
+              links: [{ label: 'KNETRA Site', url: 'https://karthikeya-kompella.github.io/KNETRA/' }],
+            },
+          ],
+        },
+        control: {
+          num: '09',
+          name: 'Control Room',
+          color: '#00f0ff',
+          items: [
+            {
+              id: 'contact-hub',
+              title: 'Contact, Resume & Links',
+              tags: ['SWE & AI/ML Roles', 'VIT-AP ’28'],
+              bullets: [
+                'Karthikeya Kompella · Computer Science undergraduate specializing in Data Analytics at VIT-AP University (graduating 2028).',
+                'Focused on Artificial Intelligence, Backend Engineering, and Data Systems.',
+                'Targeting software engineering and AI/ML roles; long-term goal: industry experience, then scaling my own startup.',
+              ],
+              stack: ['GitHub', 'Resume PDF'],
+              links: [
+                { label: 'GitHub Profile', url: 'https://github.com/karthikeya-kompella' },
+                { label: 'Resume PDF', url: '#resume-preview' },
+              ],
+            },
+          ],
+        },
+      },
+    };
+
+    // =========================================================================
+    // 2. UI & PANEL LOGIC
+    // =========================================================================
+    const loadingScreen = document.getElementById('loading-screen');
+    const loaderFill = document.getElementById('loader-fill');
+    const loaderStatus = document.getElementById('loader-status');
+    const roomSignText = document.getElementById('room-sign-text');
+    const roomDot = document.getElementById('room-dot');
+    const heroOverlay = document.getElementById('hero-overlay');
+    const minimapEl = document.getElementById('minimap');
+    const hoverLabelEl = document.getElementById('hover-label');
+    const projectPanel = document.getElementById('project-panel');
+    const panelCloseBtn = document.getElementById('panel-close-btn');
+    const aboutBtn = document.getElementById('about-btn');
+    const quickViewBtn = document.getElementById('quick-view-btn');
+    const quickViewModal = document.getElementById('quick-view-modal');
+    const qvCloseBtn = document.getElementById('qv-close-btn');
+    const aboutCard = document.getElementById('about-card');
+    const qvGrid = document.getElementById('qv-grid');
+    const toastEl = document.getElementById('toast');
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(() => toastEl.classList.remove('show'), 2600);
+    }
+
+    function renderBlueprintSVG(nodes) {
+      const w = 400;
+      const h = 110;
+      const boxW = 68;
+      const gap = (w - nodes.length * boxW) / Math.max(1, nodes.length - 1);
+      let svg = `<svg viewBox="0 0 ${w} ${h}" width="100%" height="100%" role="img" aria-label="Planned architecture diagram">`;
+      nodes.forEach((label, i) => {
+        const x = i * (boxW + gap);
+        const y = 30;
+        svg += `<rect x="${x}" y="${y}" width="${boxW}" height="48" rx="6" fill="rgba(56,189,248,0.12)" stroke="#38bdf8" stroke-width="1.2"/>`;
+        const words = label.split(' ');
+        const line1 = words.slice(0, 2).join(' ');
+        const line2 = words.slice(2).join(' ');
+        svg += `<text x="${x + boxW / 2}" y="${y + (line2 ? 21 : 27)}" fill="#e6f1ff" font-size="8.5" font-family="JetBrains Mono, monospace" text-anchor="middle">${line1}</text>`;
+        if (line2) {
+          svg += `<text x="${x + boxW / 2}" y="${y + 34}" fill="#7dd3fc" font-size="8" font-family="JetBrains Mono, monospace" text-anchor="middle">${line2}</text>`;
+        }
+        if (i < nodes.length - 1) {
+          svg += `<line x1="${x + boxW + 2}" y1="${y + 24}" x2="${x + boxW + gap - 2}" y2="${y + 24}" stroke="#00f0ff" stroke-width="1.4" stroke-dasharray="3,2"/>`;
+        }
+      });
+      svg += `</svg>`;
+      return svg;
+    }
+
+    // Populate About Me card inside Quick View
+    aboutCard.innerHTML =
+      `<h3>About Me</h3>` +
+      ABOUT_ME_PARAGRAPHS.map((p) => `<p>${p}</p>`).join('');
+
+    const minimapButtons = [];
+    ROOM_ORDER.forEach((key, idx) => {
+      const room = PORTFOLIO_CONTENT.rooms[key];
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'minimap-btn' + (idx === 0 ? ' active' : '');
+      btn.innerHTML = `<span>${room.num} ${room.name.split('·')[0].trim()}</span><span class="minimap-dot"></span>`;
+      btn.addEventListener('click', () => jumpToRoom(idx));
+      minimapEl.appendChild(btn);
+      minimapButtons.push(btn);
+    });
+
+    ROOM_ORDER.forEach((key) => {
+      const room = PORTFOLIO_CONTENT.rooms[key];
+      room.items.forEach((item) => {
+        if (item.id === 'about-me-rack') return; // Already featured in About Me card above
+        const card = document.createElement('article');
+        card.className = 'qv-card';
+        const bulletsHtml = item.bullets.slice(0, 3).map((b) => `<li>${b}</li>`).join('');
+        card.innerHTML = `
+          <div class="qv-card-room">${room.num} · ${room.name}</div>
+          <h3>${item.title}</h3>
+          <div class="badge-row">${item.tags.map((t) => `<span class="badge ${t === 'PLANNED' ? 'planned' : ''}">${t}</span>`).join('')}</div>
+          <ul class="panel-list">${bulletsHtml}</ul>
+          <div class="stack-pills">${item.stack.map((s) => `<span class="stack-pill">${s}</span>`).join('')}</div>
+        `;
+        qvGrid.appendChild(card);
+      });
+    });
+
+    function openProjectPanel(roomKey, itemId) {
+      const room = PORTFOLIO_CONTENT.rooms[roomKey];
+      const item = room.items.find((i) => i.id === itemId);
+      if (!item) return;
+
+      document.getElementById('panel-room-tag').textContent = `${room.num} · ${room.name}`;
+      document.getElementById('panel-title').textContent = item.title;
+      document.getElementById('panel-badges').innerHTML = item.tags
+        .map((t) => `<span class="badge ${t === 'PLANNED' ? 'planned' : ''}">${t}</span>`)
+        .join('');
+
+      const progBlock = document.getElementById('panel-progress-block');
+      if (item.statusProgress !== undefined) {
+        progBlock.style.display = 'block';
+        document.getElementById('panel-progress-fill').style.width = `${item.statusProgress}%`;
+      } else {
+        progBlock.style.display = 'none';
+      }
+
+      const extraStart = item.expectedStart ? [`Expected start: ${item.expectedStart}`] : [];
+      document.getElementById('panel-bullets').innerHTML = [...extraStart, ...item.bullets]
+        .map((b) => `<li>${b}</li>`)
+        .join('');
+
+      const bpWrap = document.getElementById('panel-blueprint-wrap');
+      if (item.blueprintNodes) {
+        bpWrap.style.display = 'block';
+        document.getElementById('panel-blueprint-svg').innerHTML = renderBlueprintSVG(item.blueprintNodes);
+      } else {
+        bpWrap.style.display = 'none';
+      }
+
+      document.getElementById('panel-stack').innerHTML = item.stack
+        .map((s) => `<span class="stack-pill">${s}</span>`)
+        .join('');
+
+      const linksEl = document.getElementById('panel-links');
+      linksEl.innerHTML = '';
+      item.links.forEach((lk) => {
+        const a = document.createElement('a');
+        a.className = 'panel-link-btn';
+        a.textContent = lk.label;
+        if (lk.url.startsWith('http')) {
+          a.href = lk.url;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+        } else {
+          a.href = '#';
+          a.addEventListener('click', (e) => {
+            e.preventDefault();
+            showToast('Link your public/resume.pdf file here in production.');
+          });
+        }
+        linksEl.appendChild(a);
+      });
+
+      projectPanel.classList.add('open');
+      projectPanel.setAttribute('aria-hidden', 'false');
+    }
+
+    // =========================================================================
+    // 3. PROCEDURAL TEXTURES FOR REAL DATA CENTER LOOK
+    // =========================================================================
+    function createPerforatedFloorTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#09111f';
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = '#15253d';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(2, 2, 252, 252);
+
+      ctx.fillStyle = '#03060d';
+      for (let y = 26; y < 236; y += 22) {
+        for (let x = 26; x < 236; x += 22) {
+          ctx.fillRect(x, y, 8, 8);
+        }
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(14, 150);
+      return tex;
+    }
+
+    function createScreenTexture(title, subtitle, accentHexStr, badgeText) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 680;
+      const ctx = c.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 680);
+      grad.addColorStop(0, '#071426');
+      grad.addColorStop(1, '#040a14');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 680);
+
+      ctx.strokeStyle = accentHexStr;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(14, 14, 484, 652);
+
+      ctx.fillStyle = accentHexStr;
+      ctx.globalAlpha = 0.16;
+      ctx.fillRect(14, 14, 484, 72);
+      ctx.globalAlpha = 1;
+
+      ctx.fillStyle = accentHexStr;
+      ctx.font = 'bold 24px monospace';
+      ctx.fillText(subtitle.toUpperCase(), 34, 58);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 38px sans-serif';
+      const words = title.split(' ');
+      let line = '';
+      let y = 165;
+      words.forEach((w) => {
+        const test = line + w + ' ';
+        if (ctx.measureText(test).width > 430) {
+          ctx.fillText(line.trim(), 34, y);
+          line = w + ' ';
+          y += 48;
+        } else {
+          line = test;
+        }
+      });
+      ctx.fillText(line.trim(), 34, y);
+
+      ctx.fillStyle = accentHexStr;
+      ctx.globalAlpha = 0.7;
+      for (let b = 0; b < 6; b++) {
+        const barW = 110 + ((b * 73) % 280);
+        ctx.fillRect(34, 340 + b * 36, barW, 14);
+      }
+      ctx.globalAlpha = 1;
+
+      if (badgeText) {
+        ctx.fillStyle = accentHexStr;
+        ctx.font = 'bold 22px monospace';
+        ctx.fillText(`[ ${badgeText} ]`, 34, 590);
+      }
+      ctx.fillStyle = '#8fa3bf';
+      ctx.font = '20px monospace';
+      ctx.fillText('CLICK TO INSPECT >', 34, 632);
+
+      return new THREE.CanvasTexture(c);
+    }
+
+    function createRoomSignTexture(num, name, accentHexStr) {
+      const c = document.createElement('canvas');
+      c.width = 768;
+      c.height = 128;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#040914';
+      ctx.fillRect(0, 0, 768, 128);
+      ctx.strokeStyle = accentHexStr;
+      ctx.lineWidth = 5;
+      ctx.strokeRect(4, 4, 760, 120);
+
+      ctx.fillStyle = accentHexStr;
+      ctx.font = 'bold 42px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${num} // ${name.toUpperCase()}`, 384, 66);
+      return new THREE.CanvasTexture(c);
+    }
+
+    // =========================================================================
+    // 4. THREE.JS SCENE — HYPERSCALE DATA CENTER + GLASS PODS
+    // =========================================================================
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const isSmallScreen = window.innerWidth < 768;
+
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isSmallScreen, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.25;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x030712);
+    scene.fog = new THREE.FogExp2(0x030712, 0.019);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 160);
+
+    scene.add(new THREE.AmbientLight(0x7a9cc6, 0.85));
+    const dirLight = new THREE.DirectionalLight(0x00f0ff, 1.1);
+    dirLight.position.set(5, 14, 10);
+    scene.add(dirLight);
+
+    const ROOM_SPACING = 28;
+    const totalLength = ROOM_ORDER.length * ROOM_SPACING + 26;
+    const interactiveObjects = [];
+    const animatables = [];
+
+    // 1. Raised Perforated Data Center Floor
+    const floorTex = createPerforatedFloorTexture();
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(34, totalLength),
+      new THREE.MeshStandardMaterial({ map: floorTex, roughness: 0.4, metalness: 0.65 })
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(0, 0, -totalLength / 2 + 14);
+    scene.add(floor);
+
+    const stripGeo = new THREE.BoxGeometry(0.12, 0.025, totalLength);
+    const stripMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x00f0ff, emissiveIntensity: 1.4 });
+    [-2.1, 2.1].forEach((x) => {
+      const strip = new THREE.Mesh(stripGeo, stripMat);
+      strip.position.set(x, 0.015, -totalLength / 2 + 14);
+      scene.add(strip);
+    });
+
+    // 2. Ceiling Structure, Linear Light Bars & Overhead Cable Trays
+    const ceilingMat = new THREE.MeshStandardMaterial({ color: 0x060b14, roughness: 0.7, metalness: 0.5 });
+    const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(34, totalLength), ceilingMat);
+    ceiling.rotation.x = Math.PI / 2;
+    ceiling.position.set(0, 6.4, -totalLength / 2 + 14);
+    scene.add(ceiling);
+
+    const trayGeo = new THREE.BoxGeometry(0.9, 0.1, totalLength);
+    const trayMat = new THREE.MeshStandardMaterial({ color: 0x101c2e, metalness: 0.8, roughness: 0.35 });
+    [-3.4, 3.4].forEach((x) => {
+      const tray = new THREE.Mesh(trayGeo, trayMat);
+      tray.position.set(x, 5.75, -totalLength / 2 + 14);
+      scene.add(tray);
+    });
+
+    const lightBarCount = 46;
+    const lightBarGeo = new THREE.BoxGeometry(2.6, 0.06, 0.14);
+    const lightBarMat = new THREE.MeshStandardMaterial({ color: 0xdff6ff, emissive: 0x7dd3fc, emissiveIntensity: 1.6 });
+    const lightBars = new THREE.InstancedMesh(lightBarGeo, lightBarMat, lightBarCount);
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < lightBarCount; i++) {
+      dummy.position.set(0, 6.28, 10 - i * 6);
+      dummy.updateMatrix();
+      lightBars.setMatrixAt(i, dummy.matrix);
+    }
+    scene.add(lightBars);
+
+    // 3. Dense Hyperscale Background Server Rack Rows
+    const bgRackCount = 96;
+    const bgRackGeo = new THREE.BoxGeometry(1.5, 3.6, 1.15);
+    const bgRackMat = new THREE.MeshStandardMaterial({ color: 0x080f1c, metalness: 0.78, roughness: 0.32 });
+    const bgRacks = new THREE.InstancedMesh(bgRackGeo, bgRackMat, bgRackCount);
+
+    const ledsPerRack = 6;
+    const bgLedGeo = new THREE.BoxGeometry(0.12, 0.05, 0.04);
+    const bgLedMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0x00f0ff, emissiveIntensity: 1.7 });
+    const bgLeds = new THREE.InstancedMesh(bgLedGeo, bgLedMat, bgRackCount * ledsPerRack);
+    const bgLedData = [];
+
+    let rIdx = 0;
+    let lIdx = 0;
+    for (let z = 6; z > -totalLength + 20 && rIdx < bgRackCount - 3; z -= 5.2) {
+      [-9.2, -6.8, 6.8, 9.2].forEach((x) => {
+        if (rIdx >= bgRackCount) return;
+        dummy.position.set(x, 1.8, z);
+        dummy.rotation.set(0, x < 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        bgRacks.setMatrixAt(rIdx++, dummy.matrix);
+
+        for (let k = 0; k < ledsPerRack; k++) {
+          const lx = x + (x < 0 ? 0.59 : -0.59);
+          const ly = 0.7 + k * 0.45;
+          const lz = z + ((k % 2) - 0.5) * 0.45;
+          bgLedData.push({ idx: lIdx, x: lx, y: ly, z: lz, phase: rIdx * 0.7 + k * 1.1 });
+          dummy.position.set(lx, ly, lz);
+          dummy.rotation.set(0, 0, 0);
+          dummy.updateMatrix();
+          bgLeds.setMatrixAt(lIdx++, dummy.matrix);
+        }
+      });
+    }
+    scene.add(bgRacks);
+    scene.add(bgLeds);
+
+    const particleCount = isSmallScreen ? 160 : 420;
+    const pGeo = new THREE.BufferGeometry();
+    const pPos = new Float32Array(particleCount * 3);
+    for (let i = 0; i < particleCount; i++) {
+      pPos[i * 3] = (Math.random() - 0.5) * 18;
+      pPos[i * 3 + 1] = 0.5 + Math.random() * 5.2;
+      pPos[i * 3 + 2] = 10 - Math.random() * totalLength;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+    const particles = new THREE.Points(pGeo, new THREE.PointsMaterial({ color: 0x00f0ff, size: 0.065, transparent: true, opacity: 0.55 }));
+    scene.add(particles);
+
+    const chassisMat = new THREE.MeshStandardMaterial({ color: 0x0c1322, metalness: 0.75, roughness: 0.35 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: 0x1e3a5f,
+      transparent: true,
+      opacity: 0.14,
+      roughness: 0.1,
+      metalness: 0.2,
+    });
+    const rackGeo = new THREE.BoxGeometry(1.55, 3.3, 1.05);
+    const screenGeo = new THREE.PlaneGeometry(1.26, 1.68);
+
+    function createRoomPortal(zCenter, room) {
+      const accentHex = new THREE.Color(room.color).getHex();
+      const g = new THREE.Group();
+      g.position.set(0, 0, zCenter);
+
+      const wallGeo = new THREE.BoxGeometry(0.08, 4.4, 12);
+      [-5.2, 5.2].forEach((x) => {
+        const glass = new THREE.Mesh(wallGeo, glassMat);
+        glass.position.set(x, 2.2, -3);
+        g.add(glass);
+      });
+
+      const pGeo = new THREE.BoxGeometry(0.45, 5.0, 0.55);
+      const pL = new THREE.Mesh(pGeo, chassisMat); pL.position.set(-4.6, 2.5, 2.5);
+      const pR = new THREE.Mesh(pGeo, chassisMat); pR.position.set(4.6, 2.5, 2.5);
+      const header = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.55, 0.65), chassisMat);
+      header.position.set(0, 4.9, 2.5);
+
+      const signTex = createRoomSignTexture(room.num, room.name, room.color);
+      const signMesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(4.4, 0.72),
+        new THREE.MeshBasicMaterial({ map: signTex })
+      );
+      signMesh.position.set(0, 4.9, 2.84);
+
+      const trim = new THREE.Mesh(
+        new THREE.BoxGeometry(9.2, 0.08, 0.7),
+        new THREE.MeshStandardMaterial({ color: accentHex, emissive: accentHex, emissiveIntensity: 1.5 })
+      );
+      trim.position.set(0, 4.55, 2.5);
+
+      g.add(pL, pR, header, signMesh, trim);
+      scene.add(g);
+    }
+
+    function addInteractiveRack(roomKey, room, item, x, z, rotY) {
+      const accentHex = new THREE.Color(room.color).getHex();
+      const g = new THREE.Group();
+      g.position.set(x, 0, z);
+      g.rotation.y = rotY;
+
+      const body = new THREE.Mesh(rackGeo, chassisMat);
+      body.position.y = 1.65;
+      g.add(body);
+
+      const screenTex = createScreenTexture(item.title, room.name, room.color, item.tags[0]);
+      const scrMat = new THREE.MeshStandardMaterial({
+        map: screenTex,
+        emissive: accentHex,
+        emissiveMap: screenTex,
+        emissiveIntensity: 0.85,
+        roughness: 0.18,
+      });
+      const screen = new THREE.Mesh(screenGeo, scrMat);
+      screen.position.set(0, 2.0, 0.54);
+      screen.userData = {
+        roomKey,
+        itemId: item.id,
+        label: item.title,
+        focusOffset: { x: x < 0 ? 2.1 : -2.1, y: 0.15, z: 2.6 },
+      };
+      g.add(screen);
+      scene.add(g);
+      interactiveObjects.push(screen);
+    }
+
+    ROOM_ORDER.forEach((key, idx) => {
+      const room = PORTFOLIO_CONTENT.rooms[key];
+      const zCenter = -idx * ROOM_SPACING;
+      const accentHex = new THREE.Color(room.color).getHex();
+
+      createRoomPortal(zCenter, room);
+
+      const count = room.items.length;
+      room.items.forEach((item, i) => {
+        const side = i % 2 === 0 ? -1 : 1;
+        const row = Math.floor(i / 2);
+        const x = count === 1 ? -2.9 : side * 3.8;
+        const z = zCenter - 1.2 - row * 4.2;
+        const rotY = count === 1 ? 0.35 : -side * 0.38;
+        addInteractiveRack(key, room, item, x, z, rotY);
+      });
+
+      if (key === 'ml') {
+        const net = new THREE.Group();
+        net.position.set(0, 2.8, zCenter - 3);
+        const nodeMat = new THREE.MeshStandardMaterial({ color: accentHex, emissive: accentHex, emissiveIntensity: 1.3 });
+        for (let n = 0; n < 8; n++) {
+          const sp = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 10), nodeMat);
+          sp.position.set((n % 4 - 1.5) * 1.0, Math.floor(n / 4) * 0.9 - 0.4, (n % 2) * 0.5);
+          net.add(sp);
+        }
+        scene.add(net);
+        animatables.push((t) => { net.rotation.y = Math.sin(t * 0.6) * 0.25; });
+      } else if (key === 'ai') {
+        const cloudGeo = new THREE.BufferGeometry();
+        const pts = new Float32Array(120 * 3);
+        for (let k = 0; k < 120; k++) {
+          pts[k * 3] = (Math.random() - 0.5) * 3.2;
+          pts[k * 3 + 1] = 2.4 + (Math.random() - 0.5) * 1.8;
+          pts[k * 3 + 2] = zCenter - 4 + (Math.random() - 0.5) * 3.2;
+        }
+        cloudGeo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+        scene.add(new THREE.Points(cloudGeo, new THREE.PointsMaterial({ color: 0x00ffa3, size: 0.1 })));
+      } else if (key === 'research') {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(1.15, 0.04, 8, 36),
+          new THREE.MeshStandardMaterial({ color: 0x38bdf8, emissive: 0x38bdf8, emissiveIntensity: 1.2 })
+        );
+        ring.position.set(0, 2.8, zCenter - 4);
+        scene.add(ring);
+        animatables.push((t) => { ring.rotation.x = t * 0.7; ring.rotation.y = t * 0.4; });
+      } else if (key === 'backend') {
+        const cylGeo = new THREE.CylinderGeometry(0.65, 0.65, 0.55, 16);
+        const cylMat = new THREE.MeshStandardMaterial({ color: 0x162238, emissive: 0xf97316, emissiveIntensity: 0.6 });
+        for (let c = 0; c < 3; c++) {
+          const cyl = new THREE.Mesh(cylGeo, cylMat);
+          cyl.position.set(0, 1.2 + c * 0.7, zCenter - 5);
+          scene.add(cyl);
+        }
+      } else if (key === 'blueprint') {
+        const table = new THREE.Mesh(
+          new THREE.BoxGeometry(2.8, 0.14, 1.8),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true })
+        );
+        table.position.set(0, 1.2, zCenter - 3.5);
+        scene.add(table);
+      } else if (key === 'founders') {
+        const kMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, emissive: 0xfbbf24, emissiveIntensity: 1.15 });
+        const kGroup = new THREE.Group();
+        kGroup.position.set(1.8, 2.4, zCenter - 4);
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(0.28, 2.0, 0.2), kMat);
+        stem.position.x = -0.4;
+        const arm1 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.2, 0.2), kMat);
+        arm1.position.set(0.15, 0.4, 0); arm1.rotation.z = -0.7;
+        const arm2 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.2, 0.2), kMat);
+        arm2.position.set(0.15, -0.4, 0); arm2.rotation.z = 0.7;
+        kGroup.add(stem, arm1, arm2);
+        scene.add(kGroup);
+        animatables.push((t) => { kGroup.rotation.y = Math.sin(t * 0.5) * 0.2; });
+      }
+    });
+
+    const waypoints = ROOM_ORDER.map((_, i) => {
+      const z = -i * ROOM_SPACING + 6.5;
+      const x = i === 0 || i === ROOM_ORDER.length - 1 ? 0 : Math.sin(i * 1.15) * 0.9;
+      return new THREE.Vector3(x, 2.25, z);
+    });
+    const curve = new THREE.CatmullRomCurve3(waypoints, false, 'catmullrom', 0.35);
+
+    // =========================================================================
+    // 5. GSAP SCROLLTRIGGER + INTERACTION
+    // =========================================================================
+    gsap.registerPlugin(ScrollTrigger);
+    const state = { scrollProgress: 0, isInspecting: false, hoveredObject: null };
+
+    let activeRoomIndex = 0;
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: '#scroll-track',
+        start: 'top top',
+        end: 'bottom bottom',
+        scrub: 1.0,
+        onUpdate: () => {
+          const idx = Math.round(state.scrollProgress * (ROOM_ORDER.length - 1));
+          if (idx !== activeRoomIndex) {
+            activeRoomIndex = idx;
+            const room = PORTFOLIO_CONTENT.rooms[ROOM_ORDER[idx]];
+            roomSignText.textContent = `${room.num} · ${room.name}`;
+            roomDot.style.background = room.color;
+            roomDot.style.boxShadow = `0 0 10px ${room.color}`;
+            minimapButtons.forEach((b, bIdx) => b.classList.toggle('active', bIdx === idx));
+          }
+          heroOverlay.classList.toggle('faded', state.scrollProgress > 0.04);
+        },
+      },
+    });
+
+    const step = 1 / (ROOM_ORDER.length - 1);
+    for (let i = 0; i < ROOM_ORDER.length - 1; i++) {
+      const endU = (i + 1) * step;
+      tl.to(state, { scrollProgress: endU, duration: 1.0, ease: 'power2.inOut' });
+      if (i < ROOM_ORDER.length - 2) {
+        tl.to(state, { scrollProgress: endU, duration: 0.25, ease: 'none' });
+      }
+    }
+
+    function jumpToRoom(roomIdx) {
+      if (state.isInspecting) closeInspection();
+      const maxScroll = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo({ top: (roomIdx / (ROOM_ORDER.length - 1)) * maxScroll, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2(-999, -999);
+    let pointerScreen = { x: 0, y: 0 };
+
+    window.addEventListener('pointermove', (e) => {
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      pointerScreen = { x: e.clientX, y: e.clientY };
+    }, { passive: true });
+
+    function setHover(mesh, on) {
+      if (!mesh) return;
+      if (mesh.material.userData.base === undefined) mesh.material.userData.base = mesh.material.emissiveIntensity;
+      gsap.to(mesh.material, {
+        emissiveIntensity: on ? mesh.material.userData.base + 0.85 : mesh.material.userData.base,
+        duration: 0.2,
+      });
+    }
+
+    canvas.addEventListener('click', () => {
+      if (state.isInspecting || !state.hoveredObject) return;
+      const { roomKey, itemId, focusOffset } = state.hoveredObject.userData;
+      state.isInspecting = true;
+      hoverLabelEl.classList.remove('visible');
+
+      const worldPos = new THREE.Vector3();
+      state.hoveredObject.getWorldPosition(worldPos);
+      const dest = worldPos.clone().add(new THREE.Vector3(focusOffset.x, focusOffset.y, focusOffset.z));
+
+      gsap.to(camera.position, {
+        x: dest.x, y: dest.y, z: dest.z,
+        duration: prefersReducedMotion ? 0 : 0.8,
+        ease: 'power3.out',
+        onUpdate: () => camera.lookAt(worldPos),
+      });
+      openProjectPanel(roomKey, itemId);
+    });
+
+    function closeInspection() {
+      if (!state.isInspecting) return;
+      projectPanel.classList.remove('open');
+      projectPanel.setAttribute('aria-hidden', 'true');
+      const u = THREE.MathUtils.clamp(state.scrollProgress, 0, 1);
+      const pos = curve.getPointAt(u);
+      const look = curve.getPointAt(Math.min(u + 0.025, 1));
+      gsap.to(camera.position, {
+        x: pos.x, y: pos.y, z: pos.z,
+        duration: prefersReducedMotion ? 0 : 0.7,
+        ease: 'power2.inOut',
+        onUpdate: () => camera.lookAt(look),
+        onComplete: () => { state.isInspecting = false; },
+      });
+    }
+
+    panelCloseBtn.addEventListener('click', closeInspection);
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (quickViewModal.classList.contains('open')) quickViewModal.classList.remove('open');
+        else closeInspection();
+      }
+    });
+    aboutBtn.addEventListener('click', () => openProjectPanel('entrance', 'about-me-rack'));
+    quickViewBtn.addEventListener('click', () => quickViewModal.classList.add('open'));
+    qvCloseBtn.addEventListener('click', () => quickViewModal.classList.remove('open'));
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      ScrollTrigger.refresh();
+    });
+
+    // =========================================================================
+    // 6. ANIMATION LOOP
+    // =========================================================================
+    const clock = new THREE.Clock();
+    const smoothLook = new THREE.Vector3(0, 2.2, -10);
+    const ledAnimDummy = new THREE.Object3D();
+
+    loaderFill.style.width = '100%';
+    loaderStatus.textContent = 'Data center online';
+    setTimeout(() => loadingScreen.classList.add('hidden'), 320);
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.elapsedTime;
+
+      if (!state.isInspecting) {
+        const u = THREE.MathUtils.clamp(state.scrollProgress, 0, 1);
+        const pos = curve.getPointAt(u);
+        const look = u >= 0.995 ? pos.clone().add(new THREE.Vector3(0, -0.05, -8)) : curve.getPointAt(Math.min(u + 0.025, 1));
+        if (prefersReducedMotion) {
+          camera.position.copy(pos);
+          camera.lookAt(look);
+        } else {
+          const alpha = 1 - Math.exp(-8 * delta);
+          camera.position.lerp(pos, alpha);
+          smoothLook.lerp(look, alpha);
+          camera.lookAt(smoothLook);
+        }
+
+        raycaster.setFromCamera(pointer, camera);
+        const hits = raycaster.intersectObjects(interactiveObjects, false);
+        const hit = hits.length > 0 && hits[0].distance < 22 ? hits[0].object : null;
+        if (hit !== state.hoveredObject) {
+          setHover(state.hoveredObject, false);
+          state.hoveredObject = hit;
+          setHover(hit, true);
+          canvas.style.cursor = hit ? 'pointer' : 'default';
+          if (hit) {
+            hoverLabelEl.textContent = hit.userData.label;
+            hoverLabelEl.classList.add('visible');
+          } else {
+            hoverLabelEl.classList.remove('visible');
+          }
+        }
+        if (hit) {
+          hoverLabelEl.style.left = `${pointerScreen.x}px`;
+          hoverLabelEl.style.top = `${pointerScreen.y}px`;
+        }
+      }
+
+      if (!prefersReducedMotion) {
+        particles.position.z = (elapsed * 0.6) % 20;
+        for (let i = 0; i < animatables.length; i++) animatables[i](elapsed);
+
+        for (let i = 0; i < bgLedData.length; i++) {
+          const d = bgLedData[i];
+          const on = Math.sin(elapsed * 2.5 + d.phase) > 0.15 ? 1 : 0.2;
+          ledAnimDummy.position.set(d.x, d.y, d.z);
+          ledAnimDummy.scale.set(1, on, 1);
+          ledAnimDummy.updateMatrix();
+          bgLeds.setMatrixAt(d.idx, ledAnimDummy.matrix);
+        }
+        bgLeds.instanceMatrix.needsUpdate = true;
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+</body>
+</html>
